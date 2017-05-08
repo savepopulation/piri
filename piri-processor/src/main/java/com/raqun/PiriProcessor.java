@@ -1,4 +1,4 @@
-package com.raqun.piri;
+package com.raqun;
 
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
