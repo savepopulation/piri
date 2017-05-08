@@ -24,13 +24,17 @@ import javax.tools.Diagnostic;
 
 @SupportedAnnotationTypes("com.raqun.piri.PiriActivity")
 @SupportedSourceVersion(SourceVersion.RELEASE_7)
-public class PiriProcessor extends AbstractProcessor {
-    private List<MethodSpec> mNavigationMethodSpecs;
+public final class PiriProcessor extends AbstractProcessor {
+
+    private final List<MethodSpec> mNewIntentMethodSpecs;
+
+    public PiriProcessor() {
+        this.mNewIntentMethodSpecs = new ArrayList<>();
+    }
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnvironment) {
         super.init(processingEnvironment);
-        this.mNavigationMethodSpecs = new ArrayList<>();
     }
 
     @Override
@@ -38,7 +42,7 @@ public class PiriProcessor extends AbstractProcessor {
         final Set<? extends Element> elements = roundEnvironment.getElementsAnnotatedWith(PiriActivity.class);
         for (Element element : elements) {
             if (element.getKind() == ElementKind.CLASS) {
-                generateMethods(element);
+                generateNewIntentMethods(element);
             }
         }
 
@@ -46,18 +50,18 @@ public class PiriProcessor extends AbstractProcessor {
             if (roundEnvironment.processingOver()) {
                 generateNavigator();
             }
+            return true;
         } catch (IOException ex) {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, ex.toString());
+            return false;
         }
-
-        return true;
     }
 
-    private <T extends Element> void generateMethods(T element) {
+    private <T extends Element> void generateNewIntentMethods(T element) {
         if (!(element instanceof TypeElement)) {
             return;
         }
-        
+
         final TypeElement typeElement = (TypeElement) element;
         final MethodSpec navigationMethodSpec = MethodSpec
                 .methodBuilder("newIntentFor" + typeElement.getSimpleName())
@@ -65,13 +69,13 @@ public class PiriProcessor extends AbstractProcessor {
                 .returns(TypeName.VOID)
                 .build();
 
-        mNavigationMethodSpecs.add(navigationMethodSpec);
+        mNewIntentMethodSpecs.add(navigationMethodSpec);
     }
 
     private void generateNavigator() throws IOException {
         final TypeSpec.Builder builder = TypeSpec.classBuilder("Piri");
         builder.addModifiers(Modifier.PUBLIC, Modifier.FINAL);
-        for (MethodSpec methodSpec : mNavigationMethodSpecs) {
+        for (MethodSpec methodSpec : mNewIntentMethodSpecs) {
             builder.addMethod(methodSpec);
         }
 

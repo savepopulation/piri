@@ -8,7 +8,7 @@ import java.lang.annotation.Target;
 /**
  * Created by test on 08/05/17.
  */
-@Retention(RetentionPolicy.RUNTIME)
+@Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface PiriActivity {
 }
