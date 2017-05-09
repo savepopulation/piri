@@ -1,8 +1,8 @@
 package com.raqun.piri;
 
+import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
 import java.io.IOException;
@@ -14,7 +14,6 @@ import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -23,65 +22,71 @@ import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 
 @SupportedAnnotationTypes("com.raqun.piri.PiriActivity")
-@SupportedSourceVersion(SourceVersion.RELEASE_7)
 public final class PiriProcessor extends AbstractProcessor {
 
-    private final List<MethodSpec> mNewIntentMethodSpecs;
+    private static final ClassName intentClass = ClassName.get("android.content", "Intent");
+    private static final ClassName contextClass = ClassName.get("android.content", "Context");
+    private static final String METHOD_PREFIX_NEW_INTENT = "newIntentFor";
 
-    public PiriProcessor() {
-        this.mNewIntentMethodSpecs = new ArrayList<>();
-    }
+    private List<MethodSpec> newIntentMethodSpecs;
+    private boolean HALT = false;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnvironment) {
         super.init(processingEnvironment);
+        this.newIntentMethodSpecs = new ArrayList<>();
+    }
+
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return super.getSupportedSourceVersion();
     }
 
     @Override
     public boolean process(Set<? extends TypeElement> set, RoundEnvironment roundEnvironment) {
         final Set<? extends Element> elements = roundEnvironment.getElementsAnnotatedWith(PiriActivity.class);
         for (Element element : elements) {
-            if (element.getKind() == ElementKind.CLASS) {
-                generateNewIntentMethods(element);
+            if (element.getKind() != ElementKind.CLASS) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "PiriActivity can only use for classes!");
+                return HALT;
             }
+            generateNewIntentMethod((TypeElement) element);
         }
 
         try {
             if (roundEnvironment.processingOver()) {
                 generateNavigator();
+                return true;
             }
-            return true;
         } catch (IOException ex) {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, ex.toString());
-            return false;
         }
+
+        return HALT;
     }
 
-    private <T extends Element> void generateNewIntentMethods(T element) {
-        if (!(element instanceof TypeElement)) {
-            return;
-        }
-
-        final TypeElement typeElement = (TypeElement) element;
+    private void generateNewIntentMethod(TypeElement element) {
         final MethodSpec navigationMethodSpec = MethodSpec
-                .methodBuilder("newIntentFor" + typeElement.getSimpleName())
+                .methodBuilder(METHOD_PREFIX_NEW_INTENT + element.getSimpleName())
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                .returns(TypeName.VOID)
+                .addParameter(contextClass, "context")
+                .returns(intentClass)
+                .addStatement("return new $T($L, $L)", intentClass, "context", element.getQualifiedName() + ".class")
                 .build();
 
-        mNewIntentMethodSpecs.add(navigationMethodSpec);
+        newIntentMethodSpecs.add(navigationMethodSpec);
     }
 
     private void generateNavigator() throws IOException {
         final TypeSpec.Builder builder = TypeSpec.classBuilder("Piri");
         builder.addModifiers(Modifier.PUBLIC, Modifier.FINAL);
-        for (MethodSpec methodSpec : mNewIntentMethodSpecs) {
+        for (MethodSpec methodSpec : newIntentMethodSpecs) {
             builder.addMethod(methodSpec);
         }
 
         final TypeSpec piriSpec = builder.build();
-        final JavaFile javaFile = JavaFile.builder("com.raqun.piri.sample", piriSpec)
-                .build();
-        javaFile.writeTo(processingEnv.getFiler());
+        JavaFile.builder("com.raqun.piri.sample", piriSpec)
+                .build()
+                .writeTo(processingEnv.getFiler());
     }
 }
