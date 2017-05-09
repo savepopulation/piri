@@ -53,13 +53,13 @@ public final class PiriProcessor extends AbstractProcessor {
             generateNewIntentMethod((TypeElement) element);
         }
 
-        try {
-            if (roundEnvironment.processingOver()) {
+        if (roundEnvironment.processingOver()) {
+            try {
                 generateNavigator();
                 return true;
+            } catch (IOException ex) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, ex.toString());
             }
-        } catch (IOException ex) {
-            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, ex.toString());
         }
 
         return HALT;
