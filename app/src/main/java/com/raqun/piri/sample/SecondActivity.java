@@ -4,7 +4,8 @@ import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 
-import com.raqun.piri.PiriActivity;
+import com.raqun.PiriActivity;
+
 
 /**
  * Created by tyln on 09/05/2017.

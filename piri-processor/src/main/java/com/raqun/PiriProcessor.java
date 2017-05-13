@@ -21,7 +21,7 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 
-@SupportedAnnotationTypes("com.raqun.piri.PiriActivity")
+@SupportedAnnotationTypes("com.raqun.PiriActivity")
 public final class PiriProcessor extends AbstractProcessor {
 
     private static final ClassName intentClass = ClassName.get("android.content", "Intent");
@@ -39,7 +39,7 @@ public final class PiriProcessor extends AbstractProcessor {
 
     @Override
     public SourceVersion getSupportedSourceVersion() {
-        return super.getSupportedSourceVersion();
+        return SourceVersion.latestSupported();
     }
 
     @Override
@@ -56,7 +56,7 @@ public final class PiriProcessor extends AbstractProcessor {
         if (roundEnvironment.processingOver()) {
             try {
                 generateNavigator();
-                return true;
+                HALT = true;
             } catch (IOException ex) {
                 processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, ex.toString());
             }
