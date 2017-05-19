@@ -28,7 +28,7 @@ public class MainActivity extends AppCompatActivity {
 }
 ```
 
-If you want to pass data to YourActivity with Piri add PiriParam annotation to your fields in your Activity and received them from bundle.
+If you want to pass data to YourActivity with Piri add PiriParam annotation to your fields in your Activity and receive data from bundle.
 
 ```
 @PiriActivity
