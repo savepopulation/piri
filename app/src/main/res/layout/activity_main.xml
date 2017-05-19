@@ -9,13 +9,13 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Hello World!"/>
+        android:text="Hello World!" />
 
     <Button
         android:id="@+id/nav_button"
-        android:layout_width="144dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Go Piri" />
+        android:text="Navigate to Second Activity over Piri" />
 
 </RelativeLayout>
 

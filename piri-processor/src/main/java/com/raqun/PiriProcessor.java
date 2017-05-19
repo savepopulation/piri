@@ -6,6 +6,7 @@ import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeSpec;
 
 import java.io.IOException;
+import java.security.Key;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -19,9 +20,13 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.MirroredTypesException;
+import javax.lang.model.util.ElementFilter;
 import javax.tools.Diagnostic;
 
-@SupportedAnnotationTypes("com.raqun.PiriActivity")
+@SupportedAnnotationTypes({
+        "com.raqun.PiriActivity",
+        "com.raqun.PiriParam"
+})
 public final class PiriProcessor extends AbstractProcessor {
 
     //TODO remove static package name implementation
@@ -32,9 +37,12 @@ public final class PiriProcessor extends AbstractProcessor {
 
     private static final String METHOD_PREFIX_NEW_INTENT = "newIntentFor";
     private static final String PARAM_NAME_CONTEXT = "context";
+    private static final String CLASS_SUFFIX = ".class";
 
     private List<MethodSpec> newIntentMethodSpecs = new ArrayList<>();
     private boolean HALT = false;
+
+    private int round = -1;
 
     @Override
     public SourceVersion getSupportedSourceVersion() {
@@ -43,6 +51,12 @@ public final class PiriProcessor extends AbstractProcessor {
 
     @Override
     public boolean process(Set<? extends TypeElement> set, RoundEnvironment roundEnvironment) {
+
+        round++;
+
+        if (round == 0) {
+            Utils.init(processingEnv);
+        }
 
         if (!processAnnotations(roundEnvironment)) {
             return HALT;
@@ -64,7 +78,8 @@ public final class PiriProcessor extends AbstractProcessor {
         final Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(PiriActivity.class);
         for (Element element : elements) {
             if (element.getKind() != ElementKind.CLASS) {
-                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "PiriActivity can only be used for classes!");
+                //TODO Type Check
+                Utils.logError("PiriActivity can only be used for classes!");
                 return false;
             }
 
@@ -77,45 +92,55 @@ public final class PiriProcessor extends AbstractProcessor {
     }
 
     private boolean generateNewIntentMethod(TypeElement element) {
-
-        final PiriActivity annotation = element.getAnnotation(PiriActivity.class);
-
-        if (annotation == null) {
-            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "Annotation cannot be null!");
-            return false;
-        }
-
-        Class[] types = null;
-        String[] keys = null;
-
-        try {
-            types = annotation.types();
-            keys = annotation.names();
-            
-        } catch (MirroredTypesException ex) {
-
-            // TODO write an exception handler for this
-            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "ops stg went wrong!");
-        }
-
-        if (keys.length != types.length) {
-            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "You must specify a parameter type for eacy key!");
-            return false;
-        }
-
         final MethodSpec.Builder navigationMethodSpecBuilder = MethodSpec
                 .methodBuilder(METHOD_PREFIX_NEW_INTENT + element.getSimpleName())
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .returns(intentClass)
-                .addStatement("return new $T($L, $L)", intentClass, PARAM_NAME_CONTEXT, element.getQualifiedName() + ".class")
                 .addParameter(contextClass, PARAM_NAME_CONTEXT);
 
-        for (int i = 0; i < keys.length; i++) {
-            navigationMethodSpecBuilder.addParameter(types[i], keys[i]);
+        final List<KeyElementPair> pairs = findPiriParamFields(element);
+        if (!Validation.isNullOrEmpty(pairs)) {
+            navigationMethodSpecBuilder.addStatement("final $T intent = new $T($L, $L)",
+                    intentClass,
+                    intentClass,
+                    PARAM_NAME_CONTEXT,
+                    element.getQualifiedName() + CLASS_SUFFIX);
+            for (KeyElementPair pair : pairs) {
+                navigationMethodSpecBuilder.addParameter(ClassName.get(pair.element.asType()),
+                        pair.element.getSimpleName().toString());
+                navigationMethodSpecBuilder.addStatement("intent.putExtra(\"" + pair.key + "\", $L)",
+                        pair.element);
+            }
+            navigationMethodSpecBuilder.addStatement("return intent");
+        } else {
+            navigationMethodSpecBuilder.addStatement("return new $T($L, $L)",
+                    intentClass,
+                    PARAM_NAME_CONTEXT,
+                    element.getQualifiedName() + CLASS_SUFFIX);
         }
 
         newIntentMethodSpecs.add(navigationMethodSpecBuilder.build());
         return true;
+    }
+
+    private List<KeyElementPair> findPiriParamFields(Element parent) {
+        final List<? extends Element> citizens = parent.getEnclosedElements();
+        if (Validation.isNullOrEmpty(citizens)) return null;
+
+        final List<KeyElementPair> pairs = new ArrayList<>();
+        for (Element citizen : citizens) {
+            final PiriParam piriAnnotation = citizen.getAnnotation(PiriParam.class);
+            if (piriAnnotation != null) {
+                if (Validation.isNullOrEmpty(piriAnnotation.key())) {
+                    Utils.logWarning("Using PiriParam Annotation without a Key! Field'll be ignored! " +
+                            citizen.getSimpleName() + " in " + parent.getSimpleName());
+                    continue;
+                }
+                pairs.add(new KeyElementPair(piriAnnotation.key(), citizen));
+            }
+        }
+
+        return pairs;
     }
 
     private void generateNavigator() throws IOException {
