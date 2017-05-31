@@ -14,7 +14,7 @@ public class YourActivity extends AppCompatActivity {
 
 And start YourActivity from another Activity.
 
-```
+```java
 public class MainActivity extends AppCompatActivity {
 ...
  navButton.setOnClickListener(new View.OnClickListener() {
@@ -30,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
 
 If you want to pass data to YourActivity with Piri add PiriParam annotation to your fields in your Activity and receive data from bundle.
 
-```
+```java
 @PiriActivity
 public class YourActivity extends AppCompatActivity {
     
@@ -59,7 +59,7 @@ public class YourActivity extends AppCompatActivity {
 
 And start YourActivity like the following:
 
-```
+```java
 public class MainActivity extends AppCompatActivity {
 ...
 
