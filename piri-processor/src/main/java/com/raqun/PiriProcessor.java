@@ -1,7 +1,6 @@
 package com.raqun;
 
 import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeSpec;
 
@@ -60,7 +59,7 @@ public final class PiriProcessor extends AbstractProcessor {
         round++;
 
         if (round == 0) {
-            Utils.init(processingEnv);
+            EnvironmentUtil.init(processingEnv);
         }
 
         if (!processAnnotations(roundEnvironment)) {
@@ -93,7 +92,7 @@ public final class PiriProcessor extends AbstractProcessor {
 
         for (Element element : elements) {
             if (element.getKind() != ElementKind.CLASS) {
-                Utils.logError("PiriActivity can only be used for classes!");
+                EnvironmentUtil.logError("PiriActivity can only be used for classes!");
                 return false;
             }
 
@@ -114,7 +113,7 @@ public final class PiriProcessor extends AbstractProcessor {
 
         for (Element element : elements) {
             if (element.getKind() != ElementKind.CLASS) {
-                Utils.logError("PiriFragment can only be used for classes!");
+                EnvironmentUtil.logError("PiriFragment can only be used for classes!");
                 return false;
             }
 
@@ -178,7 +177,7 @@ public final class PiriProcessor extends AbstractProcessor {
             final PiriParam piriAnnotation = citizen.getAnnotation(PiriParam.class);
             if (piriAnnotation != null) {
                 if (ValidationUtil.isNullOrEmpty(piriAnnotation.key())) {
-                    Utils.logWarning("Using PiriParam Annotation without a Key! Field'll be ignored! " +
+                    EnvironmentUtil.logWarning("Using PiriParam Annotation without a Key! Field'll be ignored! " +
                             citizen.getSimpleName() + " in " + parent.getSimpleName());
                     continue;
                 }
@@ -197,7 +196,7 @@ public final class PiriProcessor extends AbstractProcessor {
             builder.addMethod(methodSpec);
         }
 
-        Utils.generateFile(builder.build(), PACKAGE_NAME);
+        EnvironmentUtil.generateFile(builder.build(), PACKAGE_NAME);
     }
 
     private void createInstanceFactory() throws IOException {
@@ -208,6 +207,6 @@ public final class PiriProcessor extends AbstractProcessor {
             builder.addMethod(methodSpec);
         }
 
-        Utils.generateFile(builder.build(), PACKAGE_NAME);
+        EnvironmentUtil.generateFile(builder.build(), PACKAGE_NAME);
     }
 }

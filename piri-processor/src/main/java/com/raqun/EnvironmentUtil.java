@@ -14,10 +14,10 @@ import javax.tools.Diagnostic;
  * Created by tyln on 19/05/2017.
  */
 
-public final class Utils {
+public final class EnvironmentUtil {
     private static ProcessingEnvironment processingEnvironment;
 
-    private Utils() {
+    private EnvironmentUtil() {
         // Empty private constructor
     }
 
