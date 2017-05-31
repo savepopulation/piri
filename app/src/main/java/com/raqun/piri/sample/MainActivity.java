@@ -23,7 +23,7 @@ public class MainActivity extends AppCompatActivity {
         navButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                startActivity(Piri.newIntentForSecondActivity(MainActivity.this, id, name));
+                startActivity(PiriIntentFactory.newIntentForSecondActivity(MainActivity.this, id, name));
             }
         });
     }

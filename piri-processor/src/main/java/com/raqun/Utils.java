@@ -1,5 +1,10 @@
 package com.raqun;
 
+import com.squareup.javapoet.JavaFile;
+import com.squareup.javapoet.TypeSpec;
+
+import java.io.IOException;
+
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
@@ -26,5 +31,11 @@ public final class Utils {
 
     public static void logWarning(String message) {
         processingEnvironment.getMessager().printMessage(Diagnostic.Kind.WARNING, message);
+    }
+
+    public static void generateFile(final TypeSpec typeSpec, String packageName) throws IOException {
+        JavaFile.builder(packageName, typeSpec)
+                .build()
+                .writeTo(processingEnvironment.getFiler());
     }
 }

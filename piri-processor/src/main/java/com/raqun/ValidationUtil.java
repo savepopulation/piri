@@ -6,9 +6,9 @@ import java.util.Collection;
  * Created by tyln on 19/05/2017.
  */
 
-public final class Validation {
+public final class ValidationUtil {
 
-    private Validation() {
+    private ValidationUtil() {
         // Private Empty Constructor
     }
 
