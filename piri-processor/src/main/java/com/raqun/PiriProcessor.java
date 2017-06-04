@@ -186,6 +186,7 @@ public final class PiriProcessor extends AbstractProcessor {
             instanceMethodSpecBuilder.addStatement("final $T instance = new $T()",
                     returnType,
                     returnType);
+            instanceMethodSpecBuilder.addStatement("instance.setArguments(args)");
             instanceMethodSpecBuilder.addStatement("return instance");
         } else {
             instanceMethodSpecBuilder.addStatement("return new $T()", returnType);
