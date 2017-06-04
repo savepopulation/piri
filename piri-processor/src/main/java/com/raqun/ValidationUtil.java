@@ -13,7 +13,7 @@ public final class ValidationUtil {
     }
 
     public static boolean isNullOrEmpty(Collection<?> collection) {
-        return collection == null || collection.size() == 0;
+        return collection == null || collection.isEmpty();
     }
 
     public static boolean isNullOrEmpty(String s) {

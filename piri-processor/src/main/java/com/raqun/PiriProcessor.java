@@ -2,9 +2,11 @@ package com.raqun;
 
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -17,6 +19,7 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 
 @SupportedAnnotationTypes({
@@ -34,6 +37,7 @@ public final class PiriProcessor extends AbstractProcessor {
 
     private static final ClassName intentClass = ClassName.get("android.content", "Intent");
     private static final ClassName contextClass = ClassName.get("android.content", "Context");
+    private static final ClassName bundleClass = ClassName.get("android.os", "Bundle");
     //private static final ClassName fragmentClass = ClassName.get("android.app", "Fragment");
     //private static final ClassName supportFragmentClass = ClassName.get("android.support.v4.app", "Fragment");
 
@@ -161,8 +165,28 @@ public final class PiriProcessor extends AbstractProcessor {
         final MethodSpec.Builder instanceMethodSpecBuilder = MethodSpec
                 .methodBuilder(METHOD_PREFIX_NEW_INSTANCE + element.getSimpleName())
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                .addStatement("return new $T()", ClassName.get(element))
                 .returns(ClassName.get(element));
+
+        final TypeName returnType = ClassName.get(element);
+        final List<KeyElementPair> pairs = findPiriParamFields(element);
+        if (!ValidationUtil.isNullOrEmpty(pairs)) {
+
+            instanceMethodSpecBuilder.addStatement("final $T args = new $T()",
+                    bundleClass,
+                    bundleClass);
+            for (KeyElementPair pair : pairs) {
+                instanceMethodSpecBuilder.addParameter(ClassName.get(pair.element.asType()),
+                        pair.element.getSimpleName().toString());
+                instanceMethodSpecBuilder.addStatement(getTypeStatement(pair) + pair.key + "\", $L)",
+                        pair.element);
+            }
+            instanceMethodSpecBuilder.addStatement("final $T instance = new $T()",
+                    returnType,
+                    returnType);
+            instanceMethodSpecBuilder.addStatement("return instance");
+        } else {
+            instanceMethodSpecBuilder.addStatement("return new $T()", returnType);
+        }
 
         newInstanceMethodSpecs.add(instanceMethodSpecBuilder.build());
         return true;
@@ -186,6 +210,22 @@ public final class PiriProcessor extends AbstractProcessor {
         }
 
         return pairs;
+    }
+
+    private static String getTypeStatement(KeyElementPair pair) {
+        final TypeName type = ClassName.get(pair.element.asType());
+
+        switch (type.toString()) {
+            case "java.lang.long":
+            case "java.lang.Long":
+                return "args.putLong(\"";
+
+            case "java.lang.String":
+                return "args.putString(\"";
+        }
+
+        EnvironmentUtil.logError("Unknown Type " + type.toString());
+        throw new IllegalArgumentException("Unknown parameter!");
     }
 
     private void createIntentFactory() throws IOException {
