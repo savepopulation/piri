@@ -142,11 +142,12 @@ public final class PiriProcessor extends AbstractProcessor {
                     intentClass,
                     intentClass,
                     PARAM_NAME_CONTEXT,
-                    element.getQualifiedName() + CLASS_SUFFIX);
+                    element.getSimpleName() + CLASS_SUFFIX);
             for (KeyElementPair pair : pairs) {
                 navigationMethodSpecBuilder.addParameter(ClassName.get(pair.element.asType()),
                         pair.element.getSimpleName().toString());
-                navigationMethodSpecBuilder.addStatement("intent.putExtra(\"" + pair.key + "\", $L)",
+                navigationMethodSpecBuilder.addStatement("intent.putExtra($S, $L)",
+                        pair.key,
                         pair.element);
             }
             navigationMethodSpecBuilder.addStatement("return intent");
@@ -170,14 +171,16 @@ public final class PiriProcessor extends AbstractProcessor {
         final TypeName returnType = ClassName.get(element);
         final List<KeyElementPair> pairs = findPiriParamFields(element);
         if (!ValidationUtil.isNullOrEmpty(pairs)) {
-
             instanceMethodSpecBuilder.addStatement("final $T args = new $T()",
                     bundleClass,
                     bundleClass);
             for (KeyElementPair pair : pairs) {
-                instanceMethodSpecBuilder.addParameter(ClassName.get(pair.element.asType()),
+                final String statementSuffix = "($S, $L)";
+                final TypeName typeName = ClassName.get(pair.element.asType());
+                instanceMethodSpecBuilder.addParameter(typeName,
                         pair.element.getSimpleName().toString());
-                instanceMethodSpecBuilder.addStatement(getTypeStatement(pair) + pair.key + "\", $L)",
+                instanceMethodSpecBuilder.addStatement(generateStatementByType(typeName) + statementSuffix,
+                        pair.key,
                         pair.element);
             }
             instanceMethodSpecBuilder.addStatement("final $T instance = new $T()",
@@ -212,20 +215,17 @@ public final class PiriProcessor extends AbstractProcessor {
         return pairs;
     }
 
-    private static String getTypeStatement(KeyElementPair pair) {
-        final TypeName type = ClassName.get(pair.element.asType());
-
-        switch (type.toString()) {
-            case "java.lang.long":
+    private static String generateStatementByType(TypeName typeName) {
+        switch (typeName.toString()) {
+            case "long":
             case "java.lang.Long":
-                return "args.putLong(\"";
+                return "args.putLong";
 
             case "java.lang.String":
-                return "args.putString(\"";
+                return "args.putString";
         }
 
-        EnvironmentUtil.logError("Unknown Type " + type.toString());
-        throw new IllegalArgumentException("Unknown parameter!");
+        throw new IllegalArgumentException("Unsuppoerted parameter type!" + typeName.toString());
     }
 
     private void createIntentFactory() throws IOException {

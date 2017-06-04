@@ -14,15 +14,17 @@ import com.raqun.PiriParam;
 @PiriFragment
 public class SampleFragment extends Fragment {
 
-    private static final String EXTRA_ID = "extra_key";
+    private static final String EXTRA_ID = "extra_id";
     private static final String EXTRA_NAME = "extra_name";
 
     @PiriParam(key = EXTRA_ID)
     private Long id;
 
+    @PiriParam(key = "extra_count")
+    private long count;
+
     @PiriParam(key = EXTRA_NAME)
     private String name;
-
 
     public static SampleFragment newInstance() {
 
