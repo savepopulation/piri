@@ -1,5 +1,5 @@
 # piri
-Piri is a lightweight anotation processing library that generates static factory methods which creates new intents for activities in Android.
+Piri is a lightweight annotation processing library that generates static factory methods which creates new intents for activities in Android.
 
 ## How to use? 
 
