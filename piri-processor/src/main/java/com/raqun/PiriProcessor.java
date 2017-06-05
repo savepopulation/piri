@@ -6,7 +6,6 @@ import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -19,7 +18,6 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 
 @SupportedAnnotationTypes({
@@ -49,6 +47,7 @@ public final class PiriProcessor extends AbstractProcessor {
 
     private final List<MethodSpec> newIntentMethodSpecs = new ArrayList<>();
     private final List<MethodSpec> newInstanceMethodSpecs = new ArrayList<>();
+
     private boolean HALT = false;
     private int round = -1;
 
@@ -90,7 +89,7 @@ public final class PiriProcessor extends AbstractProcessor {
     private boolean processActivities(RoundEnvironment roundEnv) {
         final Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(PiriActivity.class);
 
-        if (ValidationUtil.isNullOrEmpty(elements)) {
+        if (Utils.isNullOrEmpty(elements)) {
             return true;
         }
 
@@ -111,7 +110,7 @@ public final class PiriProcessor extends AbstractProcessor {
     private boolean processFragments(RoundEnvironment roundEnv) {
         final Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(PiriFragment.class);
 
-        if (ValidationUtil.isNullOrEmpty(elements)) {
+        if (Utils.isNullOrEmpty(elements)) {
             return true;
         }
 
@@ -137,7 +136,7 @@ public final class PiriProcessor extends AbstractProcessor {
                 .addParameter(contextClass, PARAM_NAME_CONTEXT);
 
         final List<KeyElementPair> pairs = findPiriParamFields(element);
-        if (!ValidationUtil.isNullOrEmpty(pairs)) {
+        if (!Utils.isNullOrEmpty(pairs)) {
             navigationMethodSpecBuilder.addStatement("final $T intent = new $T($L, $L)",
                     intentClass,
                     intentClass,
@@ -170,7 +169,7 @@ public final class PiriProcessor extends AbstractProcessor {
 
         final TypeName returnType = ClassName.get(element);
         final List<KeyElementPair> pairs = findPiriParamFields(element);
-        if (!ValidationUtil.isNullOrEmpty(pairs)) {
+        if (!Utils.isNullOrEmpty(pairs)) {
             instanceMethodSpecBuilder.addStatement("final $T args = new $T()",
                     bundleClass,
                     bundleClass);
@@ -179,7 +178,7 @@ public final class PiriProcessor extends AbstractProcessor {
                 final TypeName typeName = ClassName.get(pair.element.asType());
                 instanceMethodSpecBuilder.addParameter(typeName,
                         pair.element.getSimpleName().toString());
-                instanceMethodSpecBuilder.addStatement(generateStatementByType(typeName) + statementSuffix,
+                instanceMethodSpecBuilder.addStatement(generateArgsStatement(typeName) + statementSuffix,
                         pair.key,
                         pair.element);
             }
@@ -198,13 +197,13 @@ public final class PiriProcessor extends AbstractProcessor {
 
     private List<KeyElementPair> findPiriParamFields(Element parent) {
         final List<? extends Element> citizens = parent.getEnclosedElements();
-        if (ValidationUtil.isNullOrEmpty(citizens)) return null;
+        if (Utils.isNullOrEmpty(citizens)) return null;
 
         final List<KeyElementPair> pairs = new ArrayList<>();
         for (Element citizen : citizens) {
             final PiriParam piriAnnotation = citizen.getAnnotation(PiriParam.class);
             if (piriAnnotation != null) {
-                if (ValidationUtil.isNullOrEmpty(piriAnnotation.key())) {
+                if (Utils.isNullOrEmpty(piriAnnotation.key())) {
                     EnvironmentUtil.logWarning("Using PiriParam Annotation without a Key! Field'll be ignored! " +
                             citizen.getSimpleName() + " in " + parent.getSimpleName());
                     continue;
@@ -216,17 +215,48 @@ public final class PiriProcessor extends AbstractProcessor {
         return pairs;
     }
 
-    private static String generateStatementByType(TypeName typeName) {
-        switch (typeName.toString()) {
-            case "long":
-            case "java.lang.Long":
-                return "args.putLong";
-
-            case "java.lang.String":
-                return "args.putString";
+    private static String generateArgsStatement(TypeName typeName) {
+        if (typeName.isPrimitive()) {
+            return generateArgsStatementForPrimitives(typeName);
+        } else if (typeName.isBoxedPrimitive()) {
+            return generateArgsStatementForPrimitives(typeName.unbox());
         }
 
-        throw new IllegalArgumentException("Unsuppoerted parameter type!" + typeName.toString());
+        throw new IllegalArgumentException("Unsupported type!");
+    }
+
+    private static String generateArgsStatementForPrimitives(TypeName typeName) {
+        if (!typeName.isPrimitive()) {
+            throw new IllegalArgumentException("Type must be primitive!");
+        }
+
+        switch (typeName.toString()) {
+            case "boolean":
+                return "args.putBoolean";
+
+            case "byte":
+                return "args.putByte";
+
+            case "int":
+                return "args.putInt";
+
+            case "float":
+                return "args.putFloat";
+
+            case "double":
+                return "args.putDouble";
+
+            case "char":
+                return "args.putChar";
+
+            case "long":
+                return "args.putLong";
+
+            case "short":
+                return "args.putShort";
+        }
+
+        throw new IllegalArgumentException("Unsupported primitive type!");
     }
 
     private void createIntentFactory() throws IOException {
