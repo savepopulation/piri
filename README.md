@@ -75,3 +75,7 @@ public class MainActivity extends AppCompatActivity {
 ...
 }
 ```
+
+## Baking..
+Piri'll also support new instance method generation for Fragments soon. 
+
