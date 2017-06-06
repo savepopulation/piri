@@ -36,14 +36,14 @@ public final class PiriProcessor extends AbstractProcessor {
     private static final ClassName intentClass = ClassName.get("android.content", "Intent");
     private static final ClassName contextClass = ClassName.get("android.content", "Context");
     private static final ClassName bundleClass = ClassName.get("android.os", "Bundle");
-    //private static final ClassName fragmentClass = ClassName.get("android.app", "Fragment");
-    //private static final ClassName supportFragmentClass = ClassName.get("android.support.v4.app", "Fragment");
 
     private static final String METHOD_PREFIX_NEW_INTENT = "newIntentFor";
     private static final String METHOD_PREFIX_NEW_INSTANCE = "newInstanceOf";
 
     private static final String PARAM_NAME_CONTEXT = "context";
     private static final String CLASS_SUFFIX = ".class";
+
+    private static final String BUNDLE_PUT_METHOD_PREFIX = "args.put";
 
     private final List<MethodSpec> newIntentMethodSpecs = new ArrayList<>();
     private final List<MethodSpec> newInstanceMethodSpecs = new ArrayList<>();
@@ -217,46 +217,41 @@ public final class PiriProcessor extends AbstractProcessor {
 
     private static String generateArgsStatement(TypeName typeName) {
         if (typeName.isPrimitive()) {
-            return generateArgsStatementForPrimitives(typeName);
+            return generatePutStatementForPrimitives(typeName);
         } else if (typeName.isBoxedPrimitive()) {
-            return generateArgsStatementForPrimitives(typeName.unbox());
+            return generatePutStatementForPrimitives(typeName.unbox());
+        } else {
+            // TODO get rid of switch statement
+            switch (typeName.toString()) {
+                case "java.lang.String":
+                    return "args.putString";
+
+                case "android.os.IBinder":
+                    return "args.putBinder";
+
+                case "android.os.Bundle":
+                    return "args.putBundle";
+
+                case "android.util.Size":
+                    return "args.putSize";
+            }
         }
 
         throw new IllegalArgumentException("Unsupported type!");
     }
 
-    private static String generateArgsStatementForPrimitives(TypeName typeName) {
+    private static String generatePutStatementForPrimitives(TypeName typeName) {
         if (!typeName.isPrimitive()) {
             throw new IllegalArgumentException("Type must be primitive!");
         }
 
-        switch (typeName.toString()) {
-            case "boolean":
-                return "args.putBoolean";
+        final String name = typeName.toString();
+        final StringBuilder statementBuilder = new StringBuilder();
+        statementBuilder.append(BUNDLE_PUT_METHOD_PREFIX)
+                .append(Character.toUpperCase(name.charAt(0)))
+                .append(name.substring(1));
 
-            case "byte":
-                return "args.putByte";
-
-            case "int":
-                return "args.putInt";
-
-            case "float":
-                return "args.putFloat";
-
-            case "double":
-                return "args.putDouble";
-
-            case "char":
-                return "args.putChar";
-
-            case "long":
-                return "args.putLong";
-
-            case "short":
-                return "args.putShort";
-        }
-
-        throw new IllegalArgumentException("Unsupported primitive type!");
+        return statementBuilder.toString();
     }
 
     private void createIntentFactory() throws IOException {
