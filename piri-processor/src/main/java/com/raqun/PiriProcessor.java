@@ -6,6 +6,7 @@ import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
 import java.io.IOException;
+import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -18,6 +19,8 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 
 @SupportedAnnotationTypes({
@@ -178,7 +181,7 @@ public final class PiriProcessor extends AbstractProcessor {
                 final TypeName typeName = ClassName.get(pair.element.asType());
                 instanceMethodSpecBuilder.addParameter(typeName,
                         pair.element.getSimpleName().toString());
-                instanceMethodSpecBuilder.addStatement(generateArgsStatement(typeName) + statementSuffix,
+                instanceMethodSpecBuilder.addStatement(generateArgsStatement((VariableElement) pair.element) + statementSuffix,
                         pair.key,
                         pair.element);
             }
@@ -215,28 +218,47 @@ public final class PiriProcessor extends AbstractProcessor {
         return pairs;
     }
 
-    private static String generateArgsStatement(TypeName typeName) {
+    private static String generateArgsStatement(VariableElement element) {
+        final TypeMirror typeMirror = element.asType();
+        final TypeName typeName = ClassName.get(typeMirror);
+
         if (typeName.isPrimitive()) {
             return generatePutStatementForPrimitives(typeName);
-        } else if (typeName.isBoxedPrimitive()) {
-            return generatePutStatementForPrimitives(typeName.unbox());
-        } else {
-            // TODO get rid of switch statement
-            switch (typeName.toString()) {
-                case "java.lang.String":
-                    return "args.putString";
-
-                case "android.os.IBinder":
-                    return "args.putBinder";
-
-                case "android.os.Bundle":
-                    return "args.putBundle";
-
-                case "android.util.Size":
-                    return "args.putSize";
-            }
         }
 
+        if (typeName.isBoxedPrimitive()) {
+            return generatePutStatementForPrimitives(typeName.unbox());
+        }
+
+        // TODO get rid of switch statement
+        switch (typeName.toString()) {
+            case "java.lang.String":
+                return "args.putString";
+
+            case "android.os.IBinder":
+                return "args.putBinder";
+
+            case "android.os.Bundle":
+                return "args.putBundle";
+
+            case "android.util.Size":
+                return "args.putSize";
+
+            case "android.util.SizeF":
+                return "args.putSizeF";
+
+        }
+
+        if (EnvironmentUtil.isParcelable(typeMirror)) {
+            return "args.putParcelable";
+        }
+
+        if (EnvironmentUtil.isSerializable(typeMirror)) {
+            return "args.putSerializable";
+        }
+
+        // TODO implement arrays
+        EnvironmentUtil.logError(typeMirror.toString());
         throw new IllegalArgumentException("Unsupported type!");
     }
 

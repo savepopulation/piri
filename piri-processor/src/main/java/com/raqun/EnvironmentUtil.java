@@ -8,6 +8,7 @@ import java.io.IOException;
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
+import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 
 /**
@@ -37,5 +38,17 @@ public final class EnvironmentUtil {
         JavaFile.builder(packageName, typeSpec)
                 .build()
                 .writeTo(processingEnvironment.getFiler());
+    }
+
+    public static boolean isSerializable(TypeMirror typeMirror) {
+        final TypeMirror serializable = processingEnvironment.getElementUtils()
+                .getTypeElement("java.io.Serializable").asType();
+        return processingEnvironment.getTypeUtils().isAssignable(typeMirror, serializable);
+    }
+
+    public static boolean isParcelable(TypeMirror typeMirror) {
+        final TypeMirror parcelable = processingEnvironment.getElementUtils()
+                .getTypeElement("android.os.Parcelable").asType();
+        return processingEnvironment.getTypeUtils().isAssignable(typeMirror, parcelable);
     }
 }
