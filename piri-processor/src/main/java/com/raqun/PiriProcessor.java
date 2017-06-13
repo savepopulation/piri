@@ -1,12 +1,12 @@
 package com.raqun;
 
 import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
 import java.io.IOException;
-import java.security.Key;
+import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -19,29 +19,39 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.MirroredTypesException;
-import javax.lang.model.util.ElementFilter;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 
 @SupportedAnnotationTypes({
         "com.raqun.PiriActivity",
-        "com.raqun.PiriParam"
+        "com.raqun.PiriFragment",
+        "com.raqun.PiriParam",
 })
 public final class PiriProcessor extends AbstractProcessor {
 
     //TODO remove static package name implementation
     private static final String PACKAGE_NAME = "com.raqun.piri.sample";
 
+    private static final String CLASS_NAME_INTENT_FACTORY = "PiriIntentFactory";
+    private static final String CLASS_NAME_INSTANCE_FACTORY = "PiriInstanceFactory";
+
     private static final ClassName intentClass = ClassName.get("android.content", "Intent");
     private static final ClassName contextClass = ClassName.get("android.content", "Context");
+    private static final ClassName bundleClass = ClassName.get("android.os", "Bundle");
 
     private static final String METHOD_PREFIX_NEW_INTENT = "newIntentFor";
+    private static final String METHOD_PREFIX_NEW_INSTANCE = "newInstanceOf";
+
     private static final String PARAM_NAME_CONTEXT = "context";
     private static final String CLASS_SUFFIX = ".class";
 
-    private List<MethodSpec> newIntentMethodSpecs = new ArrayList<>();
-    private boolean HALT = false;
+    private static final String BUNDLE_PUT_METHOD_PREFIX = "args.put";
 
+    private final List<MethodSpec> newIntentMethodSpecs = new ArrayList<>();
+    private final List<MethodSpec> newInstanceMethodSpecs = new ArrayList<>();
+
+    private boolean HALT = false;
     private int round = -1;
 
     @Override
@@ -55,7 +65,7 @@ public final class PiriProcessor extends AbstractProcessor {
         round++;
 
         if (round == 0) {
-            Utils.init(processingEnv);
+            EnvironmentUtil.init(processingEnv);
         }
 
         if (!processAnnotations(roundEnvironment)) {
@@ -64,7 +74,8 @@ public final class PiriProcessor extends AbstractProcessor {
 
         if (roundEnvironment.processingOver()) {
             try {
-                generateNavigator();
+                createIntentFactory();
+                createInstanceFactory();
                 HALT = true;
             } catch (IOException ex) {
                 processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, ex.toString());
@@ -75,15 +86,44 @@ public final class PiriProcessor extends AbstractProcessor {
     }
 
     private boolean processAnnotations(RoundEnvironment roundEnv) {
+        return processActivities(roundEnv) && processFragments(roundEnv);
+    }
+
+    private boolean processActivities(RoundEnvironment roundEnv) {
         final Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(PiriActivity.class);
+
+        if (Utils.isNullOrEmpty(elements)) {
+            return true;
+        }
+
         for (Element element : elements) {
             if (element.getKind() != ElementKind.CLASS) {
-                //TODO Type Check
-                Utils.logError("PiriActivity can only be used for classes!");
+                EnvironmentUtil.logError("PiriActivity can only be used for classes!");
                 return false;
             }
 
             if (!generateNewIntentMethod((TypeElement) element)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private boolean processFragments(RoundEnvironment roundEnv) {
+        final Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(PiriFragment.class);
+
+        if (Utils.isNullOrEmpty(elements)) {
+            return true;
+        }
+
+        for (Element element : elements) {
+            if (element.getKind() != ElementKind.CLASS) {
+                EnvironmentUtil.logError("PiriFragment can only be used for classes!");
+                return false;
+            }
+
+            if (!generateNewInstanceMethod((TypeElement) element)) {
                 return false;
             }
         }
@@ -99,16 +139,17 @@ public final class PiriProcessor extends AbstractProcessor {
                 .addParameter(contextClass, PARAM_NAME_CONTEXT);
 
         final List<KeyElementPair> pairs = findPiriParamFields(element);
-        if (!Validation.isNullOrEmpty(pairs)) {
+        if (!Utils.isNullOrEmpty(pairs)) {
             navigationMethodSpecBuilder.addStatement("final $T intent = new $T($L, $L)",
                     intentClass,
                     intentClass,
                     PARAM_NAME_CONTEXT,
-                    element.getQualifiedName() + CLASS_SUFFIX);
+                    element.getSimpleName() + CLASS_SUFFIX);
             for (KeyElementPair pair : pairs) {
                 navigationMethodSpecBuilder.addParameter(ClassName.get(pair.element.asType()),
                         pair.element.getSimpleName().toString());
-                navigationMethodSpecBuilder.addStatement("intent.putExtra(\"" + pair.key + "\", $L)",
+                navigationMethodSpecBuilder.addStatement("intent.putExtra($S, $L)",
+                        pair.key,
                         pair.element);
             }
             navigationMethodSpecBuilder.addStatement("return intent");
@@ -123,16 +164,50 @@ public final class PiriProcessor extends AbstractProcessor {
         return true;
     }
 
+    private boolean generateNewInstanceMethod(TypeElement element) {
+        final MethodSpec.Builder instanceMethodSpecBuilder = MethodSpec
+                .methodBuilder(METHOD_PREFIX_NEW_INSTANCE + element.getSimpleName())
+                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                .returns(ClassName.get(element));
+
+        final TypeName returnType = ClassName.get(element);
+        final List<KeyElementPair> pairs = findPiriParamFields(element);
+        if (!Utils.isNullOrEmpty(pairs)) {
+            instanceMethodSpecBuilder.addStatement("final $T args = new $T()",
+                    bundleClass,
+                    bundleClass);
+            for (KeyElementPair pair : pairs) {
+                final String statementSuffix = "($S, $L)";
+                final TypeName typeName = ClassName.get(pair.element.asType());
+                instanceMethodSpecBuilder.addParameter(typeName,
+                        pair.element.getSimpleName().toString());
+                instanceMethodSpecBuilder.addStatement(generateArgsStatement((VariableElement) pair.element) + statementSuffix,
+                        pair.key,
+                        pair.element);
+            }
+            instanceMethodSpecBuilder.addStatement("final $T instance = new $T()",
+                    returnType,
+                    returnType);
+            instanceMethodSpecBuilder.addStatement("instance.setArguments(args)");
+            instanceMethodSpecBuilder.addStatement("return instance");
+        } else {
+            instanceMethodSpecBuilder.addStatement("return new $T()", returnType);
+        }
+
+        newInstanceMethodSpecs.add(instanceMethodSpecBuilder.build());
+        return true;
+    }
+
     private List<KeyElementPair> findPiriParamFields(Element parent) {
         final List<? extends Element> citizens = parent.getEnclosedElements();
-        if (Validation.isNullOrEmpty(citizens)) return null;
+        if (Utils.isNullOrEmpty(citizens)) return null;
 
         final List<KeyElementPair> pairs = new ArrayList<>();
         for (Element citizen : citizens) {
             final PiriParam piriAnnotation = citizen.getAnnotation(PiriParam.class);
             if (piriAnnotation != null) {
-                if (Validation.isNullOrEmpty(piriAnnotation.key())) {
-                    Utils.logWarning("Using PiriParam Annotation without a Key! Field'll be ignored! " +
+                if (Utils.isNullOrEmpty(piriAnnotation.key())) {
+                    EnvironmentUtil.logWarning("Using PiriParam Annotation without a Key! Field'll be ignored! " +
                             citizen.getSimpleName() + " in " + parent.getSimpleName());
                     continue;
                 }
@@ -143,16 +218,83 @@ public final class PiriProcessor extends AbstractProcessor {
         return pairs;
     }
 
-    private void generateNavigator() throws IOException {
-        final TypeSpec.Builder builder = TypeSpec.classBuilder("Piri");
+    private static String generateArgsStatement(VariableElement element) {
+        final TypeMirror typeMirror = element.asType();
+        final TypeName typeName = ClassName.get(typeMirror);
+
+        if (typeName.isPrimitive()) {
+            return generatePutStatementForPrimitives(typeName);
+        }
+
+        if (typeName.isBoxedPrimitive()) {
+            return generatePutStatementForPrimitives(typeName.unbox());
+        }
+
+        // TODO get rid of switch statement
+        switch (typeName.toString()) {
+            case "java.lang.String":
+                return "args.putString";
+
+            case "android.os.IBinder":
+                return "args.putBinder";
+
+            case "android.os.Bundle":
+                return "args.putBundle";
+
+            case "android.util.Size":
+                return "args.putSize";
+
+            case "android.util.SizeF":
+                return "args.putSizeF";
+
+        }
+
+        if (EnvironmentUtil.isParcelable(typeMirror)) {
+            return "args.putParcelable";
+        }
+
+        if (EnvironmentUtil.isSerializable(typeMirror)) {
+            return "args.putSerializable";
+        }
+
+        // TODO implement arrays
+        EnvironmentUtil.logError(typeMirror.toString());
+        throw new IllegalArgumentException("Unsupported type!");
+    }
+
+    private static String generatePutStatementForPrimitives(TypeName typeName) {
+        if (!typeName.isPrimitive()) {
+            throw new IllegalArgumentException("Type must be primitive!");
+        }
+
+        final String name = typeName.toString();
+        final StringBuilder statementBuilder = new StringBuilder();
+        statementBuilder.append(BUNDLE_PUT_METHOD_PREFIX)
+                .append(Character.toUpperCase(name.charAt(0)))
+                .append(name.substring(1));
+
+        return statementBuilder.toString();
+    }
+
+    private void createIntentFactory() throws IOException {
+        final TypeSpec.Builder builder = TypeSpec.classBuilder(CLASS_NAME_INTENT_FACTORY);
         builder.addModifiers(Modifier.PUBLIC, Modifier.FINAL);
+
         for (MethodSpec methodSpec : newIntentMethodSpecs) {
             builder.addMethod(methodSpec);
         }
 
-        final TypeSpec piriSpec = builder.build();
-        JavaFile.builder(PACKAGE_NAME, piriSpec)
-                .build()
-                .writeTo(processingEnv.getFiler());
+        EnvironmentUtil.generateFile(builder.build(), PACKAGE_NAME);
+    }
+
+    private void createInstanceFactory() throws IOException {
+        final TypeSpec.Builder builder = TypeSpec.classBuilder(CLASS_NAME_INSTANCE_FACTORY);
+        builder.addModifiers(Modifier.PUBLIC, Modifier.FINAL);
+
+        for (MethodSpec methodSpec : newInstanceMethodSpecs) {
+            builder.addMethod(methodSpec);
+        }
+
+        EnvironmentUtil.generateFile(builder.build(), PACKAGE_NAME);
     }
 }
