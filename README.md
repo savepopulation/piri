@@ -1,11 +1,11 @@
 # piri
-Piri is a lightweight annotation processing library that generates static factory methods which creates new intents for activities in Android.
+Piri is a lightweight annotation processing library that generates static factory methods for your Activities and Fragments.
 
 ## How to use? 
 
 Add PiriActivity annotation to your Activity. 
 
-```
+```java
 @PiriActivity
 public class YourActivity extends AppCompatActivity {
 ...
@@ -20,7 +20,7 @@ public class MainActivity extends AppCompatActivity {
  navButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                final Intent intent = Piri.newIntentForYourActivity(MainActivity.this);
+                final Intent intent = PiriIntentFactory.newIntentForYourActivity(MainActivity.this);
                 startActivity(intent);
             }
         });
@@ -68,7 +68,7 @@ public class MainActivity extends AppCompatActivity {
  navButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                final Intent intent = Piri.newIntentForYourActivity(MainActivity.this,id,name);
+                final Intent intent = PiriIntentFactory.newIntentForYourActivity(MainActivity.this,id,name);
                 startActivity(intent);
             }
         });
@@ -76,6 +76,44 @@ public class MainActivity extends AppCompatActivity {
 }
 ```
 
-## Baking..
-Piri'll also support new instance method generation for Fragments soon. 
+##Now you can generate your fragment instances with Piri.
+
+Add PiriFragment annotation to your Fragments.
+
+```java
+@PiriFragment
+public class SampleFragment extends Fragment{
+    
+    private static final String EXTRA_ID = "extra_id";
+    private static final String EXTRA_USER = "extra_user";
+    private static final String EXTRA_BOOK = "extra_book";
+
+    @PiriParam(key = EXTRA_ID)
+    private Long id;
+
+    @PiriParam(key = EXTRA_USER)
+    private User user;
+
+    @PiriParam(key = EXTRA_BOOK)
+    private Book book;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        final Bundle args = getArguments();
+        if (args != null) {
+            id = args.getLong(EXTRA_ID, 0);
+            user = args.getParcelable(EXTRA_USER);
+            book = (Book) args.getSerializable(EXTRA_BOOK);
+        }
+    }
+}
+```
+
+<b>Arrays not supported for Fragment Instance generation for now.</b>
+
+## Where Piri comes from?
+https://en.wikipedia.org/wiki/P%C3%AEr%C3%AE_Reis
+
+
 
