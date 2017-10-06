@@ -8,6 +8,7 @@ import com.squareup.javapoet.TypeSpec;
 import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -48,8 +49,17 @@ public final class PiriProcessor extends AbstractProcessor {
 
     private static final String BUNDLE_PUT_METHOD_PREFIX = "args.put";
 
+    private static final String PARCELABLE_STATEMENT = "args.putParcelable";
+    private static final String SERIALIZABLE_STATEMENT = "args.putSerializable";
+    private static final String SIMPLE_NAME_BINDER = "IBinder";
+
     private final List<MethodSpec> newIntentMethodSpecs = new ArrayList<>();
     private final List<MethodSpec> newInstanceMethodSpecs = new ArrayList<>();
+    private static final List<String> availableClasses = Arrays.asList("string",
+            "binder",
+            "bundle",
+            "size",
+            "sizeF");
 
     private boolean HALT = false;
     private int round = -1;
@@ -221,6 +231,7 @@ public final class PiriProcessor extends AbstractProcessor {
     private static String generateArgsStatement(VariableElement element) {
         final TypeMirror typeMirror = element.asType();
         final TypeName typeName = ClassName.get(typeMirror);
+        final String simpleName = element.getSimpleName().toString();
 
         if (typeName.isPrimitive()) {
             return generatePutStatementForPrimitives(typeName);
@@ -230,35 +241,23 @@ public final class PiriProcessor extends AbstractProcessor {
             return generatePutStatementForPrimitives(typeName.unbox());
         }
 
-        // TODO get rid of switch statement
-        switch (typeName.toString()) {
-            case "java.lang.String":
-                return "args.putString";
+        if (availableClasses.contains(simpleName)) {
+            if (SIMPLE_NAME_BINDER.equals(simpleName)) {
+                return BUNDLE_PUT_METHOD_PREFIX + SIMPLE_NAME_BINDER.substring(1);
+            }
 
-            case "android.os.IBinder":
-                return "args.putBinder";
-
-            case "android.os.Bundle":
-                return "args.putBundle";
-
-            case "android.util.Size":
-                return "args.putSize";
-
-            case "android.util.SizeF":
-                return "args.putSizeF";
-
+            return generatePutStatement(simpleName);
         }
 
         if (EnvironmentUtil.isParcelable(typeMirror)) {
-            return "args.putParcelable";
+            return PARCELABLE_STATEMENT;
         }
 
         if (EnvironmentUtil.isSerializable(typeMirror)) {
-            return "args.putSerializable";
+            return SERIALIZABLE_STATEMENT;
         }
 
-        // TODO implement arrays
-        EnvironmentUtil.logError(typeMirror.toString());
+        EnvironmentUtil.logError(simpleName);
         throw new IllegalArgumentException("Unsupported type!");
     }
 
@@ -267,11 +266,14 @@ public final class PiriProcessor extends AbstractProcessor {
             throw new IllegalArgumentException("Type must be primitive!");
         }
 
-        final String name = typeName.toString();
+        return generatePutStatement(typeName.toString());
+    }
+
+    private static String generatePutStatement(String simpleName) {
         final StringBuilder statementBuilder = new StringBuilder();
         statementBuilder.append(BUNDLE_PUT_METHOD_PREFIX)
-                .append(Character.toUpperCase(name.charAt(0)))
-                .append(name.substring(1));
+                .append(Character.toUpperCase(simpleName.charAt(0)))
+                .append(simpleName.substring(1));
 
         return statementBuilder.toString();
     }

@@ -1,6 +1,7 @@
 package com.raqun;
 
 import com.squareup.javapoet.JavaFile;
+import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
 import java.io.IOException;
@@ -50,5 +51,11 @@ public final class EnvironmentUtil {
         final TypeMirror parcelable = processingEnvironment.getElementUtils()
                 .getTypeElement("android.os.Parcelable").asType();
         return processingEnvironment.getTypeUtils().isAssignable(typeMirror, parcelable);
+    }
+
+    public static boolean isArray(TypeMirror typeMirror) {
+        final TypeMirror array = processingEnvironment.getElementUtils()
+                .getTypeElement("").asType();
+        return false;
     }
 }
