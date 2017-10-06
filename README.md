@@ -76,7 +76,7 @@ public class MainActivity extends AppCompatActivity {
 }
 ```
 
-##Now you can generate your fragment instances with Piri.
+## Now you can generate your fragment instances with Piri.
 
 Add PiriFragment annotation to your Fragments.
 
