@@ -110,8 +110,6 @@ public class SampleFragment extends Fragment{
 }
 ```
 
-<b>Arrays not supported for Fragment Instance generation for now.</b>
-
 ## Where Piri comes from?
 https://en.wikipedia.org/wiki/P%C3%AEr%C3%AE_Reis
 
